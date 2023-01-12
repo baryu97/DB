@@ -31,13 +31,13 @@ if(USE_GOOGLE_TEST)
   add_subdirectory(test)
 endif()
 
-add_executable(${CMAKE_PROJECT_NAME} main.cc)
+# add_executable(${CMAKE_PROJECT_NAME} main.cc)
 
-target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC ${EXTRA_LIBS})
+# target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC ${EXTRA_LIBS})
 
-target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC
-  "${PROJECT_BINARY_DIR}"
-  )
+# target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC
+#   "${PROJECT_BINARY_DIR}"
+#   )
 
 # C++ settings
 set(CMAKE_CXX_STANDARD 17)
