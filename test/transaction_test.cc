@@ -5,7 +5,7 @@
 
 #include <gtest/gtest.h>
 #define BUF_SIZE 200
-#define DEBUG_MODE 1
+#define DEBUG_MODE 0
 #define N 3000
 #define MAX_VAL_SIZE 108
 
