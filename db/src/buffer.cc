@@ -7,12 +7,24 @@
         
 #define DEBUG_MODE 0                                             
 
-using namespace std;                                              
+using namespace std;
+
+namespace std {
+    template<>
+    struct hash<pair<int64_t, pagenum_t>> {
+        std::size_t operator()(const pair<int64_t, pagenum_t> &k) const {
+            using std::hash;
+
+            return (hash<int64_t>()(k.first) ^ (hash<pagenum_t>()(k.second) << 1));
+        }
+    };
+}
 
 pthread_mutex_t buffer_manager_latch;
 Buffer *head = nullptr;
 int max_size;
-int cur_size = 0;  
+int cur_size = 0;
+unordered_map<pair<int64_t, pagenum_t>, Buffer *> buffer_hash;
 // extern unordered_map<int64_t,int> fd_table;              
 
 int buffer_init(int num_buf) {
@@ -162,23 +174,26 @@ void buffer_write_page(int64_t table_id, pagenum_t pagenum,
 }
 
 Buffer *buffer_find(int64_t table_id, pagenum_t pagenum) {
-    Buffer *start_point = head;
-    Buffer *cur = head;
-    // while(cur != nullptr &&
-    //         (cur->page_num != pagenum || cur->table_id != table_id)){
-    //     if(cur->next == start_point){
-    //         return nullptr;
-    //     }
-    //     cur = cur->next;
-    // }
-    // return cur;
-    for (int i = 0; i < cur_size; ++i) {
-        if (cur->table_id == table_id && cur->page_num == pagenum) {
-            return cur;
-        }
-        cur = cur->next;
-    }
-    return nullptr;
+    if (buffer_hash.count({table_id,pagenum}) == 0)
+        return nullptr;
+    return buffer_hash[{table_id,pagenum}];
+//    Buffer *start_point = head;
+//    Buffer *cur = head;
+//    // while(cur != nullptr &&
+//    //         (cur->page_num != pagenum || cur->table_id != table_id)){
+//    //     if(cur->next == start_point){
+//    //         return nullptr;
+//    //     }
+//    //     cur = cur->next;
+//    // }
+//    // return cur;
+//    for (int i = 0; i < cur_size; ++i) {
+//        if (cur->table_id == table_id && cur->page_num == pagenum) {
+//            return cur;
+//        }
+//        cur = cur->next;
+//    }
+//    return nullptr;
 }
 
 Buffer *buffer_register(int64_t table_id, pagenum_t pagenum) {
@@ -213,10 +228,12 @@ Buffer *buffer_register(int64_t table_id, pagenum_t pagenum) {
             // cout << "table_id : " << buff->page_num << ", page_LSN : " << ((leaf_page *)(&buff->frame))->header.page_LSN << "\n";
             file_write_page(fd_table[buff->table_id], buff->page_num, &buff->frame);
         }
+        buffer_hash.erase({buff->table_id,buff->page_num});
     }
     buff->page_num = pagenum;
     buff->table_id = table_id;
     buff->is_dirty = false;
+    buffer_hash[{table_id,pagenum}] = buff;
     file_read_page(fd_table[table_id], pagenum, &buff->frame);
     pthread_mutex_unlock(&buff->page_latch);
     return buff;
@@ -225,6 +242,7 @@ Buffer *buffer_register(int64_t table_id, pagenum_t pagenum) {
 int shutdown_buffer() {
     Buffer *cur = head;
     Buffer *tmp;
+    buffer_hash.clear();
     for (int i = 0; i < cur_size; ++i) {
         if (cur->is_dirty) {
             file_write_page(fd_table[cur->table_id], cur->page_num, &cur->frame);
