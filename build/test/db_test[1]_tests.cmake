@@ -1,5 +1,0 @@
-add_test( RecoveryTest.InsertAndCrash /home/yesung/Desktop/DB/build/bin/db_test [==[--gtest_filter=RecoveryTest.InsertAndCrash]==] --gtest_also_run_disabled_tests)
-set_tests_properties( RecoveryTest.InsertAndCrash PROPERTIES WORKING_DIRECTORY /home/yesung/Desktop/DB/build/test SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
-add_test( RecoveryTest.Recovery1 /home/yesung/Desktop/DB/build/bin/db_test [==[--gtest_filter=RecoveryTest.Recovery1]==] --gtest_also_run_disabled_tests)
-set_tests_properties( RecoveryTest.Recovery1 PROPERTIES WORKING_DIRECTORY /home/yesung/Desktop/DB/build/test SKIP_REGULAR_EXPRESSION [==[\[  SKIPPED \]]==])
-set( db_test_TESTS RecoveryTest.InsertAndCrash RecoveryTest.Recovery1)
