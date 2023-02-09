@@ -9,7 +9,7 @@
 #include <vector>
 #include <queue>
 
-#define BUF_SIZE 500
+#define BUF_SIZE 5000
 
 #include <iostream>
 using namespace std;
@@ -38,14 +38,13 @@ class DBTest : public ::testing::Test {
 TEST_F(DBTest, InsertAsc){ //오름차순
   // int n = 10;
   srand((unsigned int)time(NULL));
-  int max_size = 112;
+  int max_size = 108;
   // char * find_val_dest = (char *) malloc(sizeof(char) * max_size);
   uint16_t find_size_dest;
 
   for (int i = 1; i <= n; i++) {
         // cout << "insert i" << i << endl;
-        // int value_size = rand() % 63 + 50;
-        int value_size = 112;
+        int value_size = 108;
         EXPECT_EQ(db_insert(tid, i, "HaHaHaHaHoHoHoHo", value_size), 0);
         // print_buffer();
         // cout << i << endl;
@@ -56,7 +55,7 @@ TEST_F(DBTest, InsertAsc){ //오름차순
 TEST_F(DBTest, InsertRan){ //랜덤
   // int n = 1000;
   srand((unsigned int)time(NULL));
-  int max_size = 112;
+  int max_size = 108;
   vector<int> v(n);
   int64_t key;
   int size;
@@ -69,7 +68,7 @@ TEST_F(DBTest, InsertRan){ //랜덤
 
   for (int i = 0; i < n; i++) {
       key = v[i];
-      size = rand() % 63 + 50;
+      size = 108;
       // size = 112;
       db_insert(tid, key, "HAAABAAA", size);
   }
@@ -175,3 +174,4 @@ TEST_F(DBTest,print){
   // }
   remove(pathname.c_str());
 }
+
