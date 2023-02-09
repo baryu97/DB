@@ -11,7 +11,7 @@
 
 /*
 TEST(ConcurrencyCtrl, SingleThread) {
-    EXPECT_EQ(init_db(BUF_SIZE), 0);
+    EXPECT_EQ(init_db(BUF_SIZE, 0, 0, "logfile.data", "logmsg.txt"), 0);
 
     if (std::remove("singleThreaded.dat") == 0)
     {
@@ -73,7 +73,7 @@ TEST(ConcurrencyCtrl, SingleThread) {
 }
 
 TEST(ConcurrencyCtrl, SingleThreadRandom) {
-    EXPECT_EQ(init_db(BUF_SIZE), 0);
+    EXPECT_EQ(init_db(BUF_SIZE, 0, 0, "logfile.data", "logmsg.txt"), 0);
 
     if (std::remove("singleThreaded.dat") == 0)
     {
@@ -194,7 +194,7 @@ void* slock_only(void* arg) {
 }
 
 TEST(ConcurrencyCtrl, SLockOnlyTest) {
-    EXPECT_EQ(init_db(BUF_SIZE), 0);
+    EXPECT_EQ(init_db(BUF_SIZE, 0, 0, "logfile.data", "logmsg.txt"), 0);
 
     if (std::remove("SLockOnly.dat") == 0)
     {
@@ -272,7 +272,7 @@ void* xlock_only_disjoint(void* arg) {
 
 
 TEST(ConcurrencyCtrl, XLockOnlyDisjointTest) {
-    EXPECT_EQ(init_db(BUF_SIZE), 0);
+    EXPECT_EQ(init_db(BUF_SIZE, 0, 0, "logfile.data", "logmsg.txt"), 0);
 
     if (std::remove("XLockOnly.dat") == 0)
     {
@@ -321,7 +321,7 @@ TEST(ConcurrencyCtrl, XLockOnlyDisjointTest) {
 }
 
 // TEST(ConcurrencyCtrl, XLockOnlyDisjointTestCheck) {
-//     EXPECT_EQ(init_db(BUF_SIZE), 0);
+//     EXPECT_EQ(init_db(BUF_SIZE, 0, 0, "logfile.data", "logmsg.txt"), 0);
 
 //     int table_id = open_table("XLockOnly.dat");
 
@@ -381,7 +381,7 @@ void* xlock_only(void* arg) {
 
 
 TEST(ConcurrencyCtrl, XLockOnlyTest) {
-    EXPECT_EQ(init_db(BUF_SIZE), 0);
+    EXPECT_EQ(init_db(BUF_SIZE, 0, 0, "logfile.data", "logmsg.txt"), 0);
 
     if (std::remove("XLockOnly.dat") == 0)
     {
@@ -429,7 +429,7 @@ TEST(ConcurrencyCtrl, XLockOnlyTest) {
 }
 
 // TEST(ConcurrencyCtrl, XLockOnlyTestCheck) {
-//     EXPECT_EQ(init_db(BUF_SIZE), 0);
+//     EXPECT_EQ(init_db(BUF_SIZE, 0, 0, "logfile.data", "logmsg.txt"), 0);
 //     int table_id = open_table("XLockOnly.dat");
 
 //     int n = N;
@@ -448,7 +448,7 @@ TEST(ConcurrencyCtrl, XLockOnlyTest) {
 // }
 
 TEST(ConcurrencyCtrl, MixedLockTest) {
-    EXPECT_EQ(init_db(BUF_SIZE), 0);
+    EXPECT_EQ(init_db(BUF_SIZE, 0, 0, "logfile.data", "logmsg.txt"), 0);
 
     if (std::remove("MixedLock.dat") == 0)
     {
@@ -492,7 +492,7 @@ TEST(ConcurrencyCtrl, MixedLockTest) {
 }
 
 // TEST(ConcurrencyCtrl, MixedLockTestCheck) {
-//     EXPECT_EQ(init_db(BUF_SIZE), 0);
+//     EXPECT_EQ(init_db(BUF_SIZE, 0, 0, "logfile.data", "logmsg.txt"), 0);
 //     int table_id = open_table("MixedLock.dat");
 
 //     int n = N;
@@ -552,7 +552,7 @@ void* deadlock_test(void* arg) {
 
 
 TEST(ConcurrencyCtrl, DeadlockTest) {
-    EXPECT_EQ(init_db(BUF_SIZE), 0);
+    EXPECT_EQ(init_db(BUF_SIZE, 0, 0, "logfile.data", "logmsg.txt"), 0);
 
     if (std::remove("deadlockTest.dat") == 0)
     {
@@ -666,7 +666,7 @@ void* deadlock_test_mixed(void* arg) {
 
 // /*
 TEST(ConcurrencyCtrl, DeadlockTestMixed) {
-    EXPECT_EQ(init_db(BUF_SIZE), 0);
+    EXPECT_EQ(init_db(BUF_SIZE, 0, 0, "logfile.data", "logmsg.txt"), 0);
 
     if (std::remove("deadlockTest.dat") == 0)
     {
