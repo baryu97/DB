@@ -5,11 +5,11 @@
 
 #include <gtest/gtest.h>
 #define BUF_SIZE 200
-#define DEBUG_MODE 0
+#define DEBUG_MODE 1
 #define N 3000
 #define MAX_VAL_SIZE 108
 
-/*
+
 TEST(ConcurrencyCtrl, SingleThread) {
     EXPECT_EQ(init_db(BUF_SIZE, 0, 0, "logfile.data", "logmsg.txt"), 0);
 
@@ -37,6 +37,7 @@ TEST(ConcurrencyCtrl, SingleThread) {
     uint16_t val_size;
     for (int i = 1; i <= n; i++) {
         char ret_val[112];
+        cout << "finding : " << i << endl;
         int res = db_find(table_id, i, ret_val, &val_size, trx_id);
         EXPECT_EQ(res, 0);
     }

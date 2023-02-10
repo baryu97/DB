@@ -31,14 +31,15 @@ void print_log_info (log_t &log){
 
 LSN_t append_log(int trx_id, int type){
     pthread_mutex_lock(&log_manager_latch);
+    trx_t * trx = find_trx(trx_id);
     if (type != BEGIN && type != COMMIT && type != ROLLBACK){
         cout << "error : append log wrong type\n";
         pthread_mutex_unlock(&log_manager_latch);
         return -1;
     }
-    log_t *log_ogj = new log_t(trx_table[trx_id]->last_LSN,trx_id,type);
-    trx_table[trx_id]->last_LSN = log_ogj->header.LSN;
-    trx_table[trx_id]->logs.insert(log_ogj);
+    log_t *log_ogj = new log_t(trx->last_LSN,trx_id,type);
+    trx->last_LSN = log_ogj->header.LSN;
+    trx->logs.insert(log_ogj);
     log_buf.push_back(log_ogj);
     LSN_t ret_val = log_ogj->header.LSN;
     pthread_mutex_unlock(&log_manager_latch);
@@ -47,14 +48,15 @@ LSN_t append_log(int trx_id, int type){
 
 LSN_t append_log(int trx_id, int type, int64_t table_id, pagenum_t pagenum, uint16_t offset, uint16_t data_length, const char *before_img, const char *after_img){
     pthread_mutex_lock(&log_manager_latch);
+    trx_t * trx = find_trx(trx_id);
     if (type != UPDATE){
         cout << "error : append log wrong type\n";
         pthread_mutex_unlock(&log_manager_latch);
         return -1;
     }
-    log_t *log_ogj = new log_t(trx_table[trx_id]->last_LSN,trx_id,type,table_id,pagenum,offset,data_length,before_img,after_img);
-    trx_table[trx_id]->last_LSN = log_ogj->header.LSN;
-    trx_table[trx_id]->logs.insert(log_ogj);
+    log_t *log_ogj = new log_t(trx->last_LSN,trx_id,type,table_id,pagenum,offset,data_length,before_img,after_img);
+    trx->last_LSN = log_ogj->header.LSN;
+    trx->logs.insert(log_ogj);
     log_buf.push_back(log_ogj);
     LSN_t ret_val = log_ogj->header.LSN;
     pthread_mutex_unlock(&log_manager_latch);
@@ -63,14 +65,15 @@ LSN_t append_log(int trx_id, int type, int64_t table_id, pagenum_t pagenum, uint
 
 LSN_t append_log(int trx_id, int type, int64_t table_id, pagenum_t pagenum, uint16_t offset, uint16_t data_length, const char *before_img, const char *after_img,LSN_t next_undo){
     pthread_mutex_lock(&log_manager_latch);
+    trx_t * trx = find_trx(trx_id);
     if (type != COMPENSATE){
         cout << "error : append log wrong type\n";
         pthread_mutex_unlock(&log_manager_latch);
         return -1;
     }
-    log_t *log_ogj = new log_t(trx_table[trx_id]->last_LSN,trx_id,type,table_id,pagenum,offset,data_length,before_img,after_img,next_undo);
-    trx_table[trx_id]->last_LSN = log_ogj->header.LSN;
-    trx_table[trx_id]->logs.insert(log_ogj);
+    log_t *log_ogj = new log_t(trx->last_LSN,trx_id,type,table_id,pagenum,offset,data_length,before_img,after_img,next_undo);
+    trx->last_LSN = log_ogj->header.LSN;
+    trx->logs.insert(log_ogj);
     log_buf.push_back(log_ogj);
     LSN_t ret_val = log_ogj->header.LSN;
     pthread_mutex_unlock(&log_manager_latch);
@@ -93,16 +96,16 @@ int recovery(int flag, int log_num, FILE *logmsg_file){
     // analysis pass
     for (log_t *log : stable_log){
         if (log->header.type == BEGIN){
-            trx_table[log->header.trx_id] = new trx_t();
-            trx_table[log->header.trx_id]->last_LSN = log->header.LSN;
+            trx_table.push_front({log->header.trx_id, new trx_t()});
+            find_trx(log->header.trx_id)->last_LSN = log->header.LSN;
             biggest_trx_id = max(biggest_trx_id, log->header.trx_id);
         } else if (log->header.type == COMMIT || log->header.type == ROLLBACK){
-            delete trx_table[log->header.trx_id];
-            trx_table.erase(log->header.trx_id);
+            delete find_trx(log->header.trx_id);
+            delete_trx(log->header.trx_id);
             winners.push_back(log->header.trx_id);
         } else {
             int64_t table_id = log->get_table_id();
-            trx_table[log->header.trx_id]->last_LSN = log->header.LSN;
+            find_trx(log->header.trx_id)->last_LSN = log->header.LSN;
             if (!table_ids.count(table_id)){
                 open_table(("DATA" + to_string(table_id)).c_str());
                 table_ids.insert(table_id);

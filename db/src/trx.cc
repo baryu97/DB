@@ -5,6 +5,7 @@
 #include <map>
 #include <vector>
 #include <iostream>
+#include <list>
 
 #define DEBUG_MODE 0
 #define MAX_RECORD 64
@@ -12,11 +13,30 @@
 using namespace std;
 
 int trx_count = 0;
-map<int, struct trx_t *> trx_table;
+list<pair<int, struct trx_t *>> trx_table;
 pthread_mutex_t trx_manager_latch;
 unordered_map<int, int> visited;
 
 unordered_map<pair<int64_t, pagenum_t>, hash_entry *> hash_table;
+
+trx_t * find_trx(int trx_id){
+    for (auto & i : trx_table) {
+        if (i.first == trx_id)
+            return i.second;
+    }
+    // exit(1);
+    // cout << "trere is no trx : " << trx_id << endl;
+    return nullptr;
+}
+
+void delete_trx(int trx_id){
+    for (auto i = trx_table.begin(); i != trx_table.end(); ++i){
+        if (i->first == trx_id){
+            i = trx_table.erase(i);
+            return;
+        }
+    }
+}
 
 void print_lock_table(int64_t table_id, pagenum_t page_id){
     hash_entry *bucket; 
@@ -33,9 +53,9 @@ void print_lock_table(int64_t table_id, pagenum_t page_id){
 
 int trx_begin() {
     pthread_mutex_lock(&trx_manager_latch);
-    trx_table[++trx_count] = new trx_t();
+    trx_table.push_front({++trx_count, new trx_t()});
     int trx_id = trx_count;
-    trx_table[trx_count]->wait_graph.push_back(0);
+//    trx_table[trx_count]->wait_graph.push_back(0);
     append_log(trx_id,BEGIN);
     pthread_mutex_unlock(&trx_manager_latch);
     return trx_id;
@@ -46,21 +66,22 @@ int trx_commit(int trx_id) {
     #if DEBUG_MODE
     cout << "Commit trx_id : " << trx_id << "\n";
     #endif
-    if (trx_table[trx_id]->temp_lock != nullptr){
+    trx_t * trx = find_trx(trx_id);
+    if (trx->temp_lock != nullptr){
         cout << "error : (trx commit)\n";
-        lock_release(trx_table[trx_id]->temp_lock);
+        lock_release(trx->temp_lock);
     }
-    lock_t *cur = trx_table[trx_id]->last_lock;
+    lock_t *cur = trx->last_lock;
     release_help(cur);
     append_log(trx_id,COMMIT);
     flush_log();
-    for (log_t * log : trx_table[trx_id]->logs) {
+    for (log_t * log : trx->logs) {
         delete log;
     }
-    trx_table[trx_id]->lock_bucket.clear();
-    trx_table[trx_id]->wait_graph.clear();
-    delete trx_table[trx_id];
-    trx_table.erase(trx_id);
+    trx->lock_bucket.clear();
+    trx->wait_graph.clear();
+    delete trx;
+    delete_trx(trx_id);
     pthread_mutex_unlock(&trx_manager_latch);
     return trx_id;
 }
@@ -83,11 +104,12 @@ int init_lock_table() {
 
 lock_t *lock_acquire(int64_t table_id, pagenum_t page_id, int64_t key, int trx_id, int lock_mode) {
     pthread_mutex_lock(&trx_manager_latch);
-    if (!trx_table.count(trx_id)){
-        cout << "error : get lock trx_id is not valid" << trx_id << "\n";
-        return nullptr;
-    }
+//    if (!trx_table.count(trx_id)){
+//        cout << "error : get lock trx_id is not valid" << trx_id << "\n";
+//        return nullptr;
+//    }
     pair<int64_t, pagenum_t> key_pair = {table_id, page_id};
+    trx_t * trx = find_trx(trx_id);
     if (hash_table.find(key_pair) == hash_table.end()) {
         hash_table[key_pair] = new hash_entry;
         hash_table[key_pair]->table_id = table_id;
@@ -97,11 +119,11 @@ lock_t *lock_acquire(int64_t table_id, pagenum_t page_id, int64_t key, int trx_i
     } 
     lock_t *lock = get_trx_lock(table_id, page_id, key, trx_id);
     if (lock == nullptr || (lock->lock_mode == SHARED && lock_mode == EXCLUSIVE)) {
-        if (!trx_table[trx_id]->lock_bucket.count(key_pair)){
-            trx_table[trx_id]->lock_bucket[key_pair][SHARED] = nullptr;
-            trx_table[trx_id]->lock_bucket[key_pair][EXCLUSIVE] = nullptr;
+        if (!trx->lock_bucket.count(key_pair)){
+            trx->lock_bucket[key_pair][SHARED] = nullptr;
+            trx->lock_bucket[key_pair][EXCLUSIVE] = nullptr;
         }
-        lock_t *cur = trx_table[trx_id]->lock_bucket[key_pair][lock_mode];
+        lock_t *cur = trx->lock_bucket[key_pair][lock_mode];
         if (cur == nullptr){
             lock = new lock_t;
 
@@ -114,9 +136,9 @@ lock_t *lock_acquire(int64_t table_id, pagenum_t page_id, int64_t key, int trx_i
 
             append_lock_to_tail(lock);
 
-            lock->trx_next_lock = trx_table[trx_id]->last_lock;
-            trx_table[trx_id]->last_lock = lock;
-            trx_table[trx_id]->lock_bucket[key_pair][lock_mode] = lock;
+            lock->trx_next_lock = trx->last_lock;
+            trx->last_lock = lock;
+            trx->lock_bucket[key_pair][lock_mode] = lock;
         }
         while (cur != nullptr){
             if (check_bitmap(cur->record_bitmap,key) && !(lock_mode == SHARED && cur->lock_mode == SHARED) && trx_id != cur->owner_trx_id){
@@ -125,7 +147,7 @@ lock_t *lock_acquire(int64_t table_id, pagenum_t page_id, int64_t key, int trx_i
             cur = cur->next;
         }
         if (cur == nullptr){
-            lock = trx_table[trx_id]->lock_bucket[key_pair][lock_mode];
+            lock = trx->lock_bucket[key_pair][lock_mode];
             lock->record_bitmap |= ((uint64_t)1 << key);
         } else {
             lock = new lock_t;
@@ -138,10 +160,10 @@ lock_t *lock_acquire(int64_t table_id, pagenum_t page_id, int64_t key, int trx_i
             lock->record_bitmap = ((uint64_t)1 << key);
 
             append_lock_to_tail(lock);
-            if (trx_table[trx_id]->temp_lock != nullptr){
+            if (trx->temp_lock != nullptr){
                 cout << "error : (lock_acquire)\n";
             }
-            trx_table[trx_id]->temp_lock = lock;
+            trx->temp_lock = lock;
         }
     }
     #if DEBUG_MODE
@@ -228,16 +250,17 @@ int lock_release(lock_t *lock_obj) {
 }
 
 lock_t *get_trx_lock(int64_t table_id, pagenum_t page_id, int64_t key, int trx_id) {
-    if (!trx_table[trx_id]->lock_bucket.count({table_id, page_id})){
+    trx_t * trx = find_trx(trx_id);
+    if (!trx->lock_bucket.count({table_id, page_id})){
         // cout << "error : get trx lock trx_id is not valid" << trx_id << "\n";
         return nullptr;
     }
-    if (trx_table[trx_id]->lock_bucket[{table_id, page_id}][EXCLUSIVE] != nullptr &&
-        check_bitmap(trx_table[trx_id]->lock_bucket[{table_id, page_id}][EXCLUSIVE]->record_bitmap,key))
-        return trx_table[trx_id]->lock_bucket[{table_id, page_id}][EXCLUSIVE];
-    if (trx_table[trx_id]->lock_bucket[{table_id, page_id}][SHARED] != nullptr &&
-        check_bitmap(trx_table[trx_id]->lock_bucket[{table_id, page_id}][SHARED]->record_bitmap,key))
-        return trx_table[trx_id]->lock_bucket[{table_id, page_id}][SHARED];
+    if (trx->lock_bucket[{table_id, page_id}][EXCLUSIVE] != nullptr &&
+        check_bitmap(trx->lock_bucket[{table_id, page_id}][EXCLUSIVE]->record_bitmap,key))
+        return trx->lock_bucket[{table_id, page_id}][EXCLUSIVE];
+    if (trx->lock_bucket[{table_id, page_id}][SHARED] != nullptr &&
+        check_bitmap(trx->lock_bucket[{table_id, page_id}][SHARED]->record_bitmap,key))
+        return trx->lock_bucket[{table_id, page_id}][SHARED];
     return nullptr;
 }
 
@@ -339,7 +362,8 @@ bool can_work(lock_t *lock_obj, int key) {
 
 int update_wait_graph(lock_t *lock) {
     lock_t *cur = lock->prev;
-    int start_edge = trx_table[lock->owner_trx_id]->wait_graph.size();
+    trx_t * trx = find_trx(lock->owner_trx_id);
+    int start_edge = trx->wait_graph.size();
     bool se_flag = false;
     while (cur != nullptr) {
         if (cur->record_id == lock->record_id) {
@@ -349,14 +373,14 @@ int update_wait_graph(lock_t *lock) {
                 // case S -> E
                 if (lock->lock_mode == EXCLUSIVE) {
                     se_flag = true;
-                    trx_table[lock->owner_trx_id]->wait_graph.push_back(cur->owner_trx_id);
+                    trx->wait_graph.push_back(cur->owner_trx_id);
                 }
             } else {
                 // case E -> *
                 if (se_flag) {
                     break;
                 }
-                trx_table[lock->owner_trx_id]->wait_graph.push_back(cur->owner_trx_id);
+                trx->wait_graph.push_back(cur->owner_trx_id);
                 break;
             }
         }
@@ -367,7 +391,8 @@ int update_wait_graph(lock_t *lock) {
 
 int update_wait_graph(lock_t *lock, int key) {
     lock_t *cur = lock->prev;
-    int start_edge = trx_table[lock->owner_trx_id]->wait_graph.size();
+    trx_t * trx = find_trx(lock->owner_trx_id);
+    int start_edge = trx->wait_graph.size();
     bool se_flag = false;
     while (cur != nullptr) {
         if (check_bitmap(cur->record_bitmap, key) && cur->owner_trx_id != lock->owner_trx_id) {
@@ -377,7 +402,7 @@ int update_wait_graph(lock_t *lock, int key) {
                 // case S -> E
                 if (lock->lock_mode == EXCLUSIVE) {
                     se_flag = true;
-                    trx_table[lock->owner_trx_id]->wait_graph.push_back(cur->owner_trx_id);
+                    trx->wait_graph.push_back(cur->owner_trx_id);
                     #if DEBUG_MODE
                     cout << "add wait graph : " << lock->owner_trx_id << " to " << cur->owner_trx_id << "\n";
                     #endif
@@ -387,7 +412,7 @@ int update_wait_graph(lock_t *lock, int key) {
                 if (se_flag) {
                     break;
                 }
-                trx_table[lock->owner_trx_id]->wait_graph.push_back(cur->owner_trx_id);
+                trx->wait_graph.push_back(cur->owner_trx_id);
                 #if DEBUG_MODE
                 cout << "add wait graph : " << lock->owner_trx_id << " to " << cur->owner_trx_id << "\n";
                 #endif
@@ -402,22 +427,23 @@ int update_wait_graph(lock_t *lock, int key) {
 
 int find_cycle(int trx_id, int start_point) {
     visited.clear();
-    for (int i = start_point; i < trx_table[trx_id]->wait_graph.size(); ++i) {
-    // for (int i = 0; i < trx_table[trx_id]->wait_graph.size(); ++i) {
-        visited[trx_table[trx_id]->wait_graph[i]] = -1;
-        for (int next_vertex: trx_table[trx_table[trx_id]->wait_graph[i]]->wait_graph) {
-            if (trx_table.find(next_vertex) == trx_table.end())
+    trx_t * trx = find_trx(trx_id);
+    for (int i = start_point; i < trx->wait_graph.size(); ++i) {
+    // for (int i = 0; i < trx->wait_graph.size(); ++i) {
+        visited[trx->wait_graph[i]] = -1;
+        for (int next_vertex: find_trx(trx->wait_graph[i])->wait_graph) {
+            if (find_trx(next_vertex) == nullptr)
                 continue;
             if (find_cycle_help(next_vertex)) {
                 return -1;
             }
         }
-        visited[trx_table[trx_id]->wait_graph[i]] = 1;
+        visited[trx->wait_graph[i]] = 1;
     }
-    // for (int i : trx_table[trx_id]->wait_graph){
+    // for (int i : trx->wait_graph){
     //     visited[i] = -1;
     //     for (int next_vertex: trx_table[i]->wait_graph) {
-    //         if (trx_table.find(next_vertex) == trx_table.end())
+    //         if (trx_table.count(next_vertex) == 0)
     //             continue;
     //         if (find_cycle_help(next_vertex)) {
     //             return -1;
@@ -437,8 +463,9 @@ bool find_cycle_help(int vertex) {
     }
 
     visited[vertex] = -1;
-    for (int next_vertex: trx_table[vertex]->wait_graph) {
-        if (trx_table.find(next_vertex) == trx_table.end())
+    trx_t * trx = find_trx(vertex);
+    for (int next_vertex: trx->wait_graph) {
+        if (find_trx(next_vertex) == nullptr)
             continue;
         if (find_cycle_help(next_vertex)) {
             return true;
@@ -553,28 +580,29 @@ void release_help(lock_t *lock_obj){
 }*/
 
 int abort_trx(int trx_id){
-    if (!trx_table.count(trx_id)){
+    trx_t * trx = find_trx(trx_id);
+    if (find_trx(trx_id) == nullptr){
         cout << "error : trx_id is not valid " << trx_id << "\n";
         return 0;
     }
-    lock_t *cur = trx_table[trx_id]->last_lock;
-    if (trx_table[trx_id]->temp_lock != nullptr){
-        lock_release(trx_table[trx_id]->temp_lock);
+    lock_t *cur = trx->last_lock;
+    if (trx->temp_lock != nullptr){
+        lock_release(trx->temp_lock);
     }
-    for (auto i = trx_table[trx_id]->logs.rbegin(); i != trx_table[trx_id]->logs.rend(); ++i) {
+    for (auto i = trx->logs.rbegin(); i != trx->logs.rend(); ++i) {
         rollback_log(*i);
     }
 //    abort_help(cur);
     release_help(cur);
     append_log(trx_id,ROLLBACK);
     flush_log();
-    trx_table[trx_id]->lock_bucket.clear();
-    trx_table[trx_id]->wait_graph.clear();
-    for (log_t * log : trx_table[trx_id]->logs) {
+    trx->lock_bucket.clear();
+    trx->wait_graph.clear();
+    for (log_t * log : trx->logs) {
         delete log;
     }
-    delete trx_table[trx_id];
-    trx_table.erase(trx_id);
+    delete trx;
+    delete_trx(trx_id);
     return trx_id;
 }
 
@@ -617,7 +645,7 @@ int implicit_to_explicit(int64_t table_id,pagenum_t page_id,int64_t key,int trx_
 }
 
 bool check_trx_alive(int trx_id){
-    if (trx_table.count(trx_id)){
+    if (find_trx(trx_id) != nullptr){
         return true;
     }
     return false;
@@ -629,12 +657,14 @@ bool check_bitmap(uint64_t bitmap, int index){
 
 int merge_lock(lock_t *lock_obj){
     int trx_id = lock_obj->owner_trx_id;
+    trx_t * trx = find_trx(trx_id);
     pair<int64_t,pagenum_t> key_pair = {lock_obj->sentinel->table_id,lock_obj->sentinel->page_id};
-    if (trx_table[trx_id]->temp_lock == lock_obj){
-        trx_table[trx_id]->lock_bucket[key_pair][lock_obj->lock_mode]->record_bitmap |= lock_obj->record_bitmap;
-        trx_table[trx_id]->temp_lock = nullptr;
+    if (trx->temp_lock == lock_obj){
+        trx->lock_bucket[key_pair][lock_obj->lock_mode]->record_bitmap |= lock_obj->record_bitmap;
+        trx->temp_lock = nullptr;
         remove_lock(lock_obj);
         delete lock_obj;
     }
     return 0;
 }
+
