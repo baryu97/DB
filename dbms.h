@@ -11,6 +11,7 @@ int trx_commit(int trx_id);
 int trx_abort(int trx_id);
 
 // Open an existing database file or create one if not exist.
+// pathname should be DATA[0-9]* (ex. "DATA8", "DATA3")
 int64_t open_table(const char *pathname);
 
 // Insert a record to the given table.
