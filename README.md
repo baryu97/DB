@@ -23,7 +23,7 @@ DBMS의 설계는 크게 세 계층으로 구성되어 있으며, 각 계층은 
 
 사용자가 File and Index Manager을 통해 데이터를 찾으려고 하면, File and Index Manager은 Buffer Manager에게 페이지를 요청합니다. Buffer Manager은 메모리에 페이지가 존재하는지 확인하고 페이지를 반환합니다. 만약 메모리에 페이지가 존재하지 않는다면 Disk Space Manager을 통해 디스크로부터 페이지를 읽어오고 메모리에 페이지를 저장합니다.
 
-동시성 관리는 DBMS의 핵심 기능 중 하나로, 여러 트랜잭션이 동시에 발생할 때 일관성을 유지하고 성능을 최적화하는 역할을 합니다. 그러나 이러한 동시성 관리는 DBMS의 다양한 요소에 영향을 미치므로, 특정 계층에서만 처리하는 것이 아니라, 필요한 곳에서 적절히 수행됩니다. 본 설계에서는 File and Index Manager와 Buffer Manager가 동시성 관리를 수행합니다. 
+동시성 관리는 DBMS의 핵심 기능 중 하나로, 여러 트랜잭션이 동시에 발생할 때 일관성을 유지하고 성능을 최적화하는 역할을 합니다. 이러한 동시성 관리는 DBMS의 다양한 요소에 영향을 미치므로, 특정 계층에서만 처리하는 것이 아니라, 필요한 곳에서 적절히 수행됩니다. 본 설계에서는 File and Index Manager와 Buffer Manager가 동시성 관리를 수행합니다. 
 
 ### Disk Space Manager
 
